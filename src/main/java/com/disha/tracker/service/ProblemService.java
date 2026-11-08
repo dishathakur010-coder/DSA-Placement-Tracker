@@ -35,14 +35,14 @@ public class ProblemService {
 
     // 3. Create a new problem from ProblemRequest DTO and save to database
     public ProblemResponse createProblem(ProblemRequest request) {
-        Problem problem = new Problem(
-                request.getTitle(),
-                request.getTopic(),
-                request.getDifficulty(),
-                request.getLink(),
-                request.getStatus(),
-                request.getNotes()
-        );
+        Problem problem = new Problem();
+        problem.setTitle(request.getTitle());
+        problem.setTopic(request.getTopic());
+        problem.setDifficulty(request.getDifficulty());
+        problem.setLink(request.getLink());
+        problem.setStatus(request.getStatus());
+        problem.setNotes(request.getNotes());
+
         Problem savedProblem = problemRepository.save(problem);
         return ProblemResponse.fromEntity(savedProblem);
     }
