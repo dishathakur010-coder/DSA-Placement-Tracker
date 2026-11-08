@@ -20,6 +20,17 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
             @Param("difficulty") String difficulty,
             @Param("status") String status
     );
+
+    @Query("SELECT COUNT(p) FROM Problem p WHERE LOWER(p.status) = 'solved'")
+    long countSolvedProblems();
+
+    @Query("SELECT p.topic, COUNT(p), SUM(CASE WHEN LOWER(p.status) = 'solved' THEN 1L ELSE 0L END) " +
+           "FROM Problem p WHERE p.topic IS NOT NULL GROUP BY p.topic")
+    List<Object[]> countProblemsByTopic();
+
+    @Query("SELECT p.difficulty, COUNT(p), SUM(CASE WHEN LOWER(p.status) = 'solved' THEN 1L ELSE 0L END) " +
+           "FROM Problem p WHERE p.difficulty IS NOT NULL GROUP BY p.difficulty")
+    List<Object[]> countProblemsByDifficulty();
 }
 
 

@@ -1,8 +1,11 @@
 package com.disha.tracker.service;
 
+import com.disha.tracker.dto.DifficultyStats;
 import com.disha.tracker.dto.ProblemRequest;
 import com.disha.tracker.dto.ProblemResponse;
 import com.disha.tracker.dto.ProblemRevisionResponse;
+import com.disha.tracker.dto.StatsResponse;
+import com.disha.tracker.dto.TopicStats;
 import com.disha.tracker.entity.Problem;
 import com.disha.tracker.exception.ResourceNotFoundException;
 import com.disha.tracker.repository.ProblemRepository;
@@ -11,7 +14,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ProblemService {
@@ -164,6 +169,72 @@ public class ProblemService {
         }
 
         return dueProblems;
+    }
+
+    // 11. Get overall preparation stats, topic breakdown, difficulty breakdown, and weakest topic
+    public StatsResponse getStats() {
+        // Overall problem counts
+        long totalProblems = problemRepository.count();
+        long solvedCount = problemRepository.countSolvedProblems();
+        long pendingCount = totalProblems - solvedCount;
+
+        // Topic breakdown
+        List<Object[]> rawTopicStats = problemRepository.countProblemsByTopic();
+        List<TopicStats> topicBreakdown = new ArrayList<>();
+
+        String weakestTopic = null;
+        double minSolvedPercentage = Double.MAX_VALUE;
+
+        for (Object[] row : rawTopicStats) {
+            String topic = (String) row[0];
+            long total = ((Number) row[1]).longValue();
+            long solved = (row[2] != null) ? ((Number) row[2]).longValue() : 0L;
+
+            // Calculate percentage rounded to 2 decimal places: e.g. 66.67
+            double percentage = (total == 0) ? 0.0 : Math.round(((double) solved / total) * 10000.0) / 100.0;
+
+            topicBreakdown.add(new TopicStats(topic, total, solved, percentage));
+
+            // Weakest topic: lowest solvedPercentage among topics with at least 2 problems
+            if (total >= 2) {
+                if (percentage < minSolvedPercentage) {
+                    minSolvedPercentage = percentage;
+                    weakestTopic = topic;
+                }
+            }
+        }
+
+        // Difficulty breakdown (Easy, Medium, Hard)
+        // Pre-populate with 0s so all three difficulties are always present in the response
+        Map<String, DifficultyStats> difficultyBreakdown = new LinkedHashMap<>();
+        difficultyBreakdown.put("Easy", new DifficultyStats(0, 0));
+        difficultyBreakdown.put("Medium", new DifficultyStats(0, 0));
+        difficultyBreakdown.put("Hard", new DifficultyStats(0, 0));
+
+        List<Object[]> rawDifficultyStats = problemRepository.countProblemsByDifficulty();
+        for (Object[] row : rawDifficultyStats) {
+            String difficulty = (String) row[0];
+            long total = ((Number) row[1]).longValue();
+            long solved = (row[2] != null) ? ((Number) row[2]).longValue() : 0L;
+
+            if (difficulty != null) {
+                for (String key : difficultyBreakdown.keySet()) {
+                    if (key.equalsIgnoreCase(difficulty)) {
+                        difficultyBreakdown.put(key, new DifficultyStats(total, solved));
+                        break;
+                    }
+                }
+            }
+        }
+
+        return new StatsResponse(
+                totalProblems,
+                solvedCount,
+                pendingCount,
+                topicBreakdown,
+                difficultyBreakdown,
+                weakestTopic
+        );
     }
 }
 
