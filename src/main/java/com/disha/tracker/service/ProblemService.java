@@ -1,11 +1,13 @@
 package com.disha.tracker.service;
 
+import com.disha.tracker.dto.ProblemRequest;
+import com.disha.tracker.dto.ProblemResponse;
 import com.disha.tracker.entity.Problem;
+import com.disha.tracker.exception.ResourceNotFoundException;
 import com.disha.tracker.repository.ProblemRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ProblemService {
@@ -16,41 +18,56 @@ public class ProblemService {
         this.problemRepository = problemRepository;
     }
 
-    // Get all problems
-    public List<Problem> getAllProblems() {
-        return problemRepository.findAll();
+    // 1. Get all problems as a list of ProblemResponse DTOs
+    public List<ProblemResponse> getAllProblems() {
+        return problemRepository.findAll()
+                .stream()
+                .map(ProblemResponse::fromEntity)
+                .toList();
     }
 
-    // Get a single problem by ID
-    public Optional<Problem> getProblemById(Long id) {
-        return problemRepository.findById(id);
+    // 2. Get a single problem by ID, or throw 404 exception if not found
+    public ProblemResponse getProblemById(Long id) {
+        Problem problem = problemRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Problem not found with id: " + id));
+        return ProblemResponse.fromEntity(problem);
     }
 
-    // Save a new problem
-    public Problem createProblem(Problem problem) {
-        return problemRepository.save(problem);
+    // 3. Create a new problem from ProblemRequest DTO and save to database
+    public ProblemResponse createProblem(ProblemRequest request) {
+        Problem problem = new Problem(
+                request.getTitle(),
+                request.getTopic(),
+                request.getDifficulty(),
+                request.getLink(),
+                request.getStatus(),
+                request.getNotes()
+        );
+        Problem savedProblem = problemRepository.save(problem);
+        return ProblemResponse.fromEntity(savedProblem);
     }
 
-    // Update an existing problem
-    public Optional<Problem> updateProblem(Long id, Problem updatedProblem) {
-        return problemRepository.findById(id).map(existingProblem -> {
-            existingProblem.setTitle(updatedProblem.getTitle());
-            existingProblem.setTopic(updatedProblem.getTopic());
-            existingProblem.setDifficulty(updatedProblem.getDifficulty());
-            existingProblem.setLink(updatedProblem.getLink());
-            existingProblem.setStatus(updatedProblem.getStatus());
-            existingProblem.setNotes(updatedProblem.getNotes());
-            return problemRepository.save(existingProblem);
-        });
+    // 4. Update an existing problem, or throw 404 exception if not found
+    public ProblemResponse updateProblem(Long id, ProblemRequest request) {
+        Problem existingProblem = problemRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Problem not found with id: " + id));
+
+        existingProblem.setTitle(request.getTitle());
+        existingProblem.setTopic(request.getTopic());
+        existingProblem.setDifficulty(request.getDifficulty());
+        existingProblem.setLink(request.getLink());
+        existingProblem.setStatus(request.getStatus());
+        existingProblem.setNotes(request.getNotes());
+
+        Problem updatedProblem = problemRepository.save(existingProblem);
+        return ProblemResponse.fromEntity(updatedProblem);
     }
 
-    // Delete a problem by ID
-    public boolean deleteProblem(Long id) {
-        if (problemRepository.existsById(id)) {
-            problemRepository.deleteById(id);
-            return true;
+    // 5. Delete a problem by ID, or throw 404 exception if not found
+    public void deleteProblem(Long id) {
+        if (!problemRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Problem not found with id: " + id);
         }
-        return false;
+        problemRepository.deleteById(id);
     }
 }
-
