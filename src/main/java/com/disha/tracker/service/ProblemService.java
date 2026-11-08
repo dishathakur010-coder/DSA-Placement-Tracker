@@ -2,12 +2,15 @@ package com.disha.tracker.service;
 
 import com.disha.tracker.dto.ProblemRequest;
 import com.disha.tracker.dto.ProblemResponse;
+import com.disha.tracker.dto.ProblemRevisionResponse;
 import com.disha.tracker.entity.Problem;
 import com.disha.tracker.exception.ResourceNotFoundException;
 import com.disha.tracker.repository.ProblemRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -113,6 +116,54 @@ public class ProblemService {
 
         Problem savedProblem = problemRepository.save(problem);
         return ProblemResponse.fromEntity(savedProblem);
+    }
+
+    // 9. Helper method: calculates the revision interval in days based on revision count
+    public int calculateRevisionInterval(int revisionCount) {
+        if (revisionCount <= 0) {
+            return 1;
+        }
+        return switch (revisionCount) {
+            case 1 -> 3;
+            case 2 -> 7;
+            case 3 -> 14;
+            default -> 30; // 4 or more revisions
+        };
+    }
+
+    // 10. Get all solved problems that are due for revision today or earlier
+    public List<ProblemRevisionResponse> getProblemsDueForRevision() {
+        LocalDate today = LocalDate.now();
+        List<Problem> allProblems = problemRepository.findAll();
+        List<ProblemRevisionResponse> dueProblems = new ArrayList<>();
+
+        for (Problem problem : allProblems) {
+            // Only consider problems that are solved
+            if (problem.getStatus() == null || !problem.getStatus().equalsIgnoreCase("Solved")) {
+                continue;
+            }
+
+            // Base date is lastRevisedDate if present, otherwise solvedDate
+            LocalDate baseDate = (problem.getLastRevisedDate() != null)
+                    ? problem.getLastRevisedDate()
+                    : problem.getSolvedDate();
+
+            // If neither date is set, we cannot calculate next due date
+            if (baseDate == null) {
+                continue;
+            }
+
+            int intervalDays = calculateRevisionInterval(problem.getRevisionCount());
+            LocalDate nextRevisionDate = baseDate.plusDays(intervalDays);
+
+            // Problem is due if nextRevisionDate is today or earlier
+            if (!nextRevisionDate.isAfter(today)) {
+                long daysOverdue = ChronoUnit.DAYS.between(nextRevisionDate, today);
+                dueProblems.add(ProblemRevisionResponse.fromEntity(problem, nextRevisionDate, daysOverdue));
+            }
+        }
+
+        return dueProblems;
     }
 }
 

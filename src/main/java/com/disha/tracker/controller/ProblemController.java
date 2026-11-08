@@ -2,6 +2,7 @@ package com.disha.tracker.controller;
 
 import com.disha.tracker.dto.ProblemRequest;
 import com.disha.tracker.dto.ProblemResponse;
+import com.disha.tracker.dto.ProblemRevisionResponse;
 import com.disha.tracker.service.ProblemService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -38,7 +39,13 @@ public class ProblemController {
         return problemService.getProblems(topic, difficulty, status);
     }
 
-    // 2. GET a single problem: GET /api/problems/{id}
+    // 2. GET problems due for revision today: GET /api/problems/revise-today
+    @GetMapping("/revise-today")
+    public List<ProblemRevisionResponse> getProblemsDueForRevision() {
+        return problemService.getProblemsDueForRevision();
+    }
+
+    // 3. GET a single problem: GET /api/problems/{id}
     @GetMapping("/{id}")
     public ResponseEntity<ProblemResponse> getProblemById(@PathVariable Long id) {
         ProblemResponse problem = problemService.getProblemById(id);
