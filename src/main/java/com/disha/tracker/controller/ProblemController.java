@@ -8,11 +8,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,10 +29,13 @@ public class ProblemController {
         this.problemService = problemService;
     }
 
-    // 1. GET all problems: GET /api/problems
+    // 1. GET problems (with optional filters): GET /api/problems?topic=Arrays&difficulty=Easy&status=Solved
     @GetMapping
-    public List<ProblemResponse> getAllProblems() {
-        return problemService.getAllProblems();
+    public List<ProblemResponse> getProblems(
+            @RequestParam(required = false) String topic,
+            @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) String status) {
+        return problemService.getProblems(topic, difficulty, status);
     }
 
     // 2. GET a single problem: GET /api/problems/{id}
@@ -60,4 +65,19 @@ public class ProblemController {
         problemService.deleteProblem(id);
         return ResponseEntity.noContent().build();
     }
+
+    // 6. Mark problem as solved: PATCH /api/problems/{id}/solve
+    @PatchMapping("/{id}/solve")
+    public ResponseEntity<ProblemResponse> solveProblem(@PathVariable Long id) {
+        ProblemResponse response = problemService.markAsSolved(id);
+        return ResponseEntity.ok(response);
+    }
+
+    // 7. Mark problem as revised: PATCH /api/problems/{id}/revise
+    @PatchMapping("/{id}/revise")
+    public ResponseEntity<ProblemResponse> reviseProblem(@PathVariable Long id) {
+        ProblemResponse response = problemService.markAsRevised(id);
+        return ResponseEntity.ok(response);
+    }
 }
+

@@ -6,6 +6,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "problems")
 public class Problem {
@@ -21,11 +23,15 @@ public class Problem {
     private String status;
     private String notes;
 
+    private LocalDate solvedDate;
+    private LocalDate lastRevisedDate;
+    private int revisionCount = 0;
+
     // Default no-argument constructor (required by JPA)
     public Problem() {
     }
 
-    // Constructor with all fields (useful for manual object creation)
+    // Constructor with basic fields (useful for manual object creation)
     public Problem(String title, String topic, String difficulty, String link, String status, String notes) {
         this.title = title;
         this.topic = topic;
@@ -33,6 +39,19 @@ public class Problem {
         this.link = link;
         this.status = status;
         this.notes = notes;
+    }
+
+    // Constructor with all fields
+    public Problem(String title, String topic, String difficulty, String link, String status, String notes, LocalDate solvedDate, LocalDate lastRevisedDate, int revisionCount) {
+        this.title = title;
+        this.topic = topic;
+        this.difficulty = difficulty;
+        this.link = link;
+        this.status = status;
+        this.notes = notes;
+        this.solvedDate = solvedDate;
+        this.lastRevisedDate = lastRevisedDate;
+        this.revisionCount = revisionCount;
     }
 
     // Getters and Setters
@@ -91,5 +110,30 @@ public class Problem {
     public void setNotes(String notes) {
         this.notes = notes;
     }
+
+    public LocalDate getSolvedDate() {
+        return solvedDate;
+    }
+
+    public void setSolvedDate(LocalDate solvedDate) {
+        this.solvedDate = solvedDate;
+    }
+
+    public LocalDate getLastRevisedDate() {
+        return lastRevisedDate;
+    }
+
+    public void setLastRevisedDate(LocalDate lastRevisedDate) {
+        this.lastRevisedDate = lastRevisedDate;
+    }
+
+    public int getRevisionCount() {
+        return revisionCount;
+    }
+
+    public void setRevisionCount(int revisionCount) {
+        this.revisionCount = revisionCount;
+    }
 }
+
 

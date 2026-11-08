@@ -2,6 +2,8 @@ package com.disha.tracker.dto;
 
 import com.disha.tracker.entity.Problem;
 
+import java.time.LocalDate;
+
 public class ProblemResponse {
 
     private Long id;
@@ -11,12 +13,15 @@ public class ProblemResponse {
     private String link;
     private String status;
     private String notes;
+    private LocalDate solvedDate;
+    private LocalDate lastRevisedDate;
+    private int revisionCount;
 
     // Default constructor
     public ProblemResponse() {
     }
 
-    // Constructor with all fields
+    // Constructor with basic fields
     public ProblemResponse(Long id, String title, String topic, String difficulty, String link, String status, String notes) {
         this.id = id;
         this.title = title;
@@ -25,6 +30,20 @@ public class ProblemResponse {
         this.link = link;
         this.status = status;
         this.notes = notes;
+    }
+
+    // Constructor with all fields
+    public ProblemResponse(Long id, String title, String topic, String difficulty, String link, String status, String notes, LocalDate solvedDate, LocalDate lastRevisedDate, int revisionCount) {
+        this.id = id;
+        this.title = title;
+        this.topic = topic;
+        this.difficulty = difficulty;
+        this.link = link;
+        this.status = status;
+        this.notes = notes;
+        this.solvedDate = solvedDate;
+        this.lastRevisedDate = lastRevisedDate;
+        this.revisionCount = revisionCount;
     }
 
     // Static helper method to convert a Problem entity into a ProblemResponse DTO
@@ -39,7 +58,10 @@ public class ProblemResponse {
                 problem.getDifficulty(),
                 problem.getLink(),
                 problem.getStatus(),
-                problem.getNotes()
+                problem.getNotes(),
+                problem.getSolvedDate(),
+                problem.getLastRevisedDate(),
+                problem.getRevisionCount()
         );
     }
 
@@ -99,5 +121,30 @@ public class ProblemResponse {
     public void setNotes(String notes) {
         this.notes = notes;
     }
+
+    public LocalDate getSolvedDate() {
+        return solvedDate;
+    }
+
+    public void setSolvedDate(LocalDate solvedDate) {
+        this.solvedDate = solvedDate;
+    }
+
+    public LocalDate getLastRevisedDate() {
+        return lastRevisedDate;
+    }
+
+    public void setLastRevisedDate(LocalDate lastRevisedDate) {
+        this.lastRevisedDate = lastRevisedDate;
+    }
+
+    public int getRevisionCount() {
+        return revisionCount;
+    }
+
+    public void setRevisionCount(int revisionCount) {
+        this.revisionCount = revisionCount;
+    }
 }
+
 
