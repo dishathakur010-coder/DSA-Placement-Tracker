@@ -7,8 +7,13 @@ import com.disha.tracker.dto.ProblemRevisionResponse;
 import com.disha.tracker.dto.StatsResponse;
 import com.disha.tracker.dto.TopicStats;
 import com.disha.tracker.entity.Problem;
+import com.disha.tracker.entity.User;
 import com.disha.tracker.exception.ResourceNotFoundException;
 import com.disha.tracker.repository.ProblemRepository;
+import com.disha.tracker.repository.UserRepository;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -22,40 +27,58 @@ import java.util.Map;
 public class ProblemService {
 
     private final ProblemRepository problemRepository;
+    private final UserRepository userRepository;
 
-    public ProblemService(ProblemRepository problemRepository) {
+    public ProblemService(ProblemRepository problemRepository, UserRepository userRepository) {
         this.problemRepository = problemRepository;
+        this.userRepository = userRepository;
     }
 
-    // 1. Get all problems as a list of ProblemResponse DTOs
+    // Helper: extracts the currently authenticated user from SecurityContextHolder
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new BadCredentialsException("User is not authenticated");
+        }
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+    }
+
+    // 1. Get all problems for the logged-in user
     public List<ProblemResponse> getAllProblems() {
-        return problemRepository.findAll()
+        User user = getCurrentUser();
+        return problemRepository.findByUserId(user.getId())
                 .stream()
                 .map(ProblemResponse::fromEntity)
                 .toList();
     }
 
-    // 2. Get problems with optional filters (topic, difficulty, status)
+    // 2. Get problems for the logged-in user with optional filters (topic, difficulty, status)
     public List<ProblemResponse> getProblems(String topic, String difficulty, String status) {
+        User user = getCurrentUser();
         String cleanTopic = (topic != null && !topic.isBlank()) ? topic.trim() : null;
         String cleanDifficulty = (difficulty != null && !difficulty.isBlank()) ? difficulty.trim() : null;
         String cleanStatus = (status != null && !status.isBlank()) ? status.trim() : null;
 
-        return problemRepository.findByFilters(cleanTopic, cleanDifficulty, cleanStatus)
+        return problemRepository.findByUserAndFilters(user.getId(), cleanTopic, cleanDifficulty, cleanStatus)
                 .stream()
                 .map(ProblemResponse::fromEntity)
                 .toList();
     }
 
-    // 3. Get a single problem by ID, or throw 404 exception if not found
+    // 3. Get a single problem by ID (only if owned by logged-in user, otherwise 404)
     public ProblemResponse getProblemById(Long id) {
-        Problem problem = problemRepository.findById(id)
+        User user = getCurrentUser();
+        Problem problem = problemRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with id: " + id));
         return ProblemResponse.fromEntity(problem);
     }
 
-    // 4. Create a new problem from ProblemRequest DTO and save to database
+    // 4. Create a new problem linked to the logged-in user
     public ProblemResponse createProblem(ProblemRequest request) {
+        User user = getCurrentUser();
+
         Problem problem = new Problem();
         problem.setTitle(request.getTitle());
         problem.setTopic(request.getTopic());
@@ -66,14 +89,16 @@ public class ProblemService {
         problem.setSolvedDate(request.getSolvedDate());
         problem.setLastRevisedDate(request.getLastRevisedDate());
         problem.setRevisionCount(request.getRevisionCount());
+        problem.setUser(user);
 
         Problem savedProblem = problemRepository.save(problem);
         return ProblemResponse.fromEntity(savedProblem);
     }
 
-    // 5. Update an existing problem, or throw 404 exception if not found
+    // 5. Update an existing problem (only if owned by logged-in user, otherwise 404)
     public ProblemResponse updateProblem(Long id, ProblemRequest request) {
-        Problem existingProblem = problemRepository.findById(id)
+        User user = getCurrentUser();
+        Problem existingProblem = problemRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with id: " + id));
 
         existingProblem.setTitle(request.getTitle());
@@ -90,17 +115,18 @@ public class ProblemService {
         return ProblemResponse.fromEntity(updatedProblem);
     }
 
-    // 6. Delete a problem by ID, or throw 404 exception if not found
+    // 6. Delete a problem by ID (only if owned by logged-in user, otherwise 404)
     public void deleteProblem(Long id) {
-        if (!problemRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Problem not found with id: " + id);
-        }
-        problemRepository.deleteById(id);
+        User user = getCurrentUser();
+        Problem problem = problemRepository.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Problem not found with id: " + id));
+        problemRepository.delete(problem);
     }
 
-    // 7. Mark a problem as solved: sets status to "Solved", solvedDate to today, revisionCount to 0
+    // 7. Mark a problem as solved (only if owned by logged-in user, otherwise 404)
     public ProblemResponse markAsSolved(Long id) {
-        Problem problem = problemRepository.findById(id)
+        User user = getCurrentUser();
+        Problem problem = problemRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with id: " + id));
 
         problem.setStatus("Solved");
@@ -111,9 +137,10 @@ public class ProblemService {
         return ProblemResponse.fromEntity(savedProblem);
     }
 
-    // 8. Mark a problem as revised: sets lastRevisedDate to today and increments revisionCount by 1
+    // 8. Mark a problem as revised (only if owned by logged-in user, otherwise 404)
     public ProblemResponse markAsRevised(Long id) {
-        Problem problem = problemRepository.findById(id)
+        User user = getCurrentUser();
+        Problem problem = problemRepository.findByIdAndUserId(id, user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found with id: " + id));
 
         problem.setLastRevisedDate(LocalDate.now());
@@ -136,13 +163,14 @@ public class ProblemService {
         };
     }
 
-    // 10. Get all solved problems that are due for revision today or earlier
+    // 10. Get all solved problems that are due for revision today or earlier for logged-in user
     public List<ProblemRevisionResponse> getProblemsDueForRevision() {
+        User user = getCurrentUser();
         LocalDate today = LocalDate.now();
-        List<Problem> allProblems = problemRepository.findAll();
+        List<Problem> userProblems = problemRepository.findByUserId(user.getId());
         List<ProblemRevisionResponse> dueProblems = new ArrayList<>();
 
-        for (Problem problem : allProblems) {
+        for (Problem problem : userProblems) {
             // Only consider problems that are solved
             if (problem.getStatus() == null || !problem.getStatus().equalsIgnoreCase("Solved")) {
                 continue;
@@ -171,15 +199,18 @@ public class ProblemService {
         return dueProblems;
     }
 
-    // 11. Get overall preparation stats, topic breakdown, difficulty breakdown, and weakest topic
+    // 11. Get preparation stats, topic breakdown, difficulty breakdown, and weakest topic for logged-in user
     public StatsResponse getStats() {
-        // Overall problem counts
-        long totalProblems = problemRepository.count();
-        long solvedCount = problemRepository.countSolvedProblems();
+        User user = getCurrentUser();
+        Long userId = user.getId();
+
+        // Overall problem counts for this user
+        long totalProblems = problemRepository.countByUserId(userId);
+        long solvedCount = problemRepository.countSolvedProblemsByUser(userId);
         long pendingCount = totalProblems - solvedCount;
 
-        // Topic breakdown
-        List<Object[]> rawTopicStats = problemRepository.countProblemsByTopic();
+        // Topic breakdown for this user
+        List<Object[]> rawTopicStats = problemRepository.countProblemsByTopicForUser(userId);
         List<TopicStats> topicBreakdown = new ArrayList<>();
 
         String weakestTopic = null;
@@ -205,13 +236,12 @@ public class ProblemService {
         }
 
         // Difficulty breakdown (Easy, Medium, Hard)
-        // Pre-populate with 0s so all three difficulties are always present in the response
         Map<String, DifficultyStats> difficultyBreakdown = new LinkedHashMap<>();
         difficultyBreakdown.put("Easy", new DifficultyStats(0, 0));
         difficultyBreakdown.put("Medium", new DifficultyStats(0, 0));
         difficultyBreakdown.put("Hard", new DifficultyStats(0, 0));
 
-        List<Object[]> rawDifficultyStats = problemRepository.countProblemsByDifficulty();
+        List<Object[]> rawDifficultyStats = problemRepository.countProblemsByDifficultyForUser(userId);
         for (Object[] row : rawDifficultyStats) {
             String difficulty = (String) row[0];
             long total = ((Number) row[1]).longValue();
@@ -237,4 +267,3 @@ public class ProblemService {
         );
     }
 }
-

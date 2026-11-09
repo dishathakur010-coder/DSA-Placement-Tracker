@@ -1,9 +1,12 @@
 package com.disha.tracker.entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import java.time.LocalDate;
@@ -26,6 +29,10 @@ public class Problem {
     private LocalDate solvedDate;
     private LocalDate lastRevisedDate;
     private int revisionCount = 0;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     // Default no-argument constructor (required by JPA)
     public Problem() {
@@ -133,6 +140,14 @@ public class Problem {
 
     public void setRevisionCount(int revisionCount) {
         this.revisionCount = revisionCount;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
     }
 }
 
