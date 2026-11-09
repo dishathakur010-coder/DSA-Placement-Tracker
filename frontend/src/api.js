@@ -29,8 +29,9 @@ export function clearAuthData() {
 /**
  * Core helper function for all API calls:
  * 1. Attaches the Bearer token in the Authorization header.
- * 2. On 401 Unauthorized, automatically clears localStorage and triggers a logout.
- * 3. Formats backend validation and error messages into friendly readable strings.
+ * 2. On 401 Unauthorized for protected routes, clears localStorage and redirects to login.
+ * 3. On 401 for auth routes (login), surfaces "Bad credentials" / "Invalid email or password".
+ * 4. Formats backend validation and error messages into friendly readable strings.
  */
 export async function apiFetch(endpoint, options = {}, onUnauthorized = null) {
   const token = getStoredToken();
@@ -49,17 +50,6 @@ export async function apiFetch(endpoint, options = {}, onUnauthorized = null) {
     headers,
   });
 
-  // Handle 401 Unauthorized (expired token or invalid session)
-  if (response.status === 401) {
-    clearAuthData();
-    if (onUnauthorized) {
-      onUnauthorized();
-    }
-    // Also dispatch a window event so any active component can respond
-    window.dispatchEvent(new Event('auth:unauthorized'));
-    throw new Error('Your session has expired. Please log in again.');
-  }
-
   // 204 No Content (e.g. DELETE requests) has no response body
   if (response.status === 204) {
     return null;
@@ -70,7 +60,28 @@ export async function apiFetch(endpoint, options = {}, onUnauthorized = null) {
   const isJson = contentType && contentType.includes('application/json');
   const data = isJson ? await response.json() : await response.text();
 
-  // If the server responded with an error (status 400, 404, 500, etc.)
+  // Handle 401 Unauthorized
+  if (response.status === 401) {
+    clearAuthData();
+
+    // If attempting to log in, 401 means Bad Credentials (wrong email or password)
+    if (endpoint.includes('/api/auth/')) {
+      let authError = 'Invalid email or password. Please try again.';
+      if (data && typeof data === 'object' && data.message) {
+        authError = data.message;
+      }
+      throw new Error(authError);
+    }
+
+    // For protected routes (/api/problems, etc.), 401 means the token is expired/invalid
+    if (onUnauthorized) {
+      onUnauthorized();
+    }
+    window.dispatchEvent(new Event('auth:unauthorized'));
+    throw new Error('Your session has expired. Please log in again.');
+  }
+
+  // If the server responded with any other error (status 400, 404, 500, etc.)
   if (!response.ok) {
     let friendlyMessage = 'Something went wrong. Please try again.';
 
@@ -119,8 +130,16 @@ export async function registerUser(name, email, password) {
 // Problem Endpoints
 // -------------------------------------------------------------
 
-export async function getProblems(onUnauthorized = null) {
-  return apiFetch('/api/problems', { method: 'GET' }, onUnauthorized);
+export async function getProblems(filters = {}, onUnauthorized = null) {
+  const params = new URLSearchParams();
+  if (filters.topic) params.append('topic', filters.topic);
+  if (filters.difficulty) params.append('difficulty', filters.difficulty);
+  if (filters.status) params.append('status', filters.status);
+
+  const queryString = params.toString();
+  const endpoint = queryString ? `/api/problems?${queryString}` : '/api/problems';
+
+  return apiFetch(endpoint, { method: 'GET' }, onUnauthorized);
 }
 
 export async function createProblem(problemData, onUnauthorized = null) {
@@ -164,3 +183,14 @@ export async function markProblemRevised(id, onUnauthorized = null) {
   );
 }
 
+// -------------------------------------------------------------
+// Revise Today & Stats Endpoints
+// -------------------------------------------------------------
+
+export async function getProblemsDueForRevision(onUnauthorized = null) {
+  return apiFetch('/api/problems/revise-today', { method: 'GET' }, onUnauthorized);
+}
+
+export async function getStats(onUnauthorized = null) {
+  return apiFetch('/api/stats', { method: 'GET' }, onUnauthorized);
+}

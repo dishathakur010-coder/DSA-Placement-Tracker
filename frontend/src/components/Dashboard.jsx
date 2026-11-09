@@ -1,87 +1,154 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ProblemForm from './ProblemForm';
 import ProblemList from './ProblemList';
+import ReviseToday from './ReviseToday';
+import StatsPanel from './StatsPanel';
 import {
   getProblems,
   deleteProblem,
   markProblemSolved,
   markProblemRevised,
+  getProblemsDueForRevision,
+  getStats,
 } from '../api';
 
 /**
  * Dashboard Component
  * 
  * What it does:
- * - Serves as the central hub for the authenticated user.
- * - Displays the header with the user's name and a "Logout" button.
- * - Manages the list of problems in state.
- * - Holds the Add Problem form and the Problems table.
+ * - Coordinates all four main panels:
+ *     1. StatsPanel (real-time progress, topic bars, weakest topic)
+ *     2. ReviseToday (spaced repetition items due today with overdue calculation)
+ *     3. ProblemForm (add new problem with topic dropdown)
+ *     4. ProblemList (filter bar + problems table with Solve, Revise, Delete)
+ * - Refreshes all data whenever any problem is added, solved, revised, or deleted.
  * 
  * What useState does here:
- * - problems: Stores the array of problems returned from Spring Boot.
- * - loading: Indicates whether we are currently fetching data from the backend.
- * - error: Stores any error message if an operation (fetching, deleting, etc.) fails.
+ * - Keeps separate state for problems, revise problems, and stats.
+ * - Keeps track of loading states for each panel so users see loading indicators.
+ * - Stores the active filter values (topic, difficulty, status).
  * 
  * What useEffect does here:
- * - useEffect(() => { loadProblems(); }, []); runs once when Dashboard mounts.
- * - This fetches the user's problems as soon as they log in and enter the dashboard.
+ * - Runs once on mount to fetch problems, revision list, and stats simultaneously.
  */
 export default function Dashboard({ user, onLogout, onUnauthorized }) {
-  // State for problems, loading, and error
+  // Problems table state
   const [problems, setProblems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [problemsLoading, setProblemsLoading] = useState(true);
+
+  // Active filters state
+  const [filters, setFilters] = useState({
+    topic: '',
+    difficulty: '',
+    status: '',
+  });
+
+  // Revise Today state
+  const [reviseProblems, setReviseProblems] = useState([]);
+  const [reviseLoading, setReviseLoading] = useState(true);
+
+  // Stats state
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Error feedback state
   const [error, setError] = useState('');
 
-  // Fetch problems from GET /api/problems
-  const loadProblems = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getProblems(onUnauthorized);
-      // data is an array of ProblemResponse objects
-      setProblems(data || []);
-    } catch (err) {
-      setError(err.message || 'Failed to load problems from server.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // 1. Fetch filtered problems from GET /api/problems?topic=&difficulty=&status=
+  const fetchProblems = useCallback(
+    async (currentFilters = filters) => {
+      setProblemsLoading(true);
+      try {
+        const data = await getProblems(currentFilters, onUnauthorized);
+        setProblems(data || []);
+      } catch (err) {
+        setError(err.message || 'Failed to fetch problems.');
+      } finally {
+        setProblemsLoading(false);
+      }
+    },
+    [filters, onUnauthorized]
+  );
 
-  // Run once when this Dashboard component appears on the screen
+  // 2. Fetch problems due for revision today from GET /api/problems/revise-today
+  const fetchReviseToday = useCallback(async () => {
+    setReviseLoading(true);
+    try {
+      const data = await getProblemsDueForRevision(onUnauthorized);
+      setReviseProblems(data || []);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch revision schedule.');
+    } finally {
+      setReviseLoading(false);
+    }
+  }, [onUnauthorized]);
+
+  // 3. Fetch statistics from GET /api/stats
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const data = await getStats(onUnauthorized);
+      setStats(data || null);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch statistics.');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [onUnauthorized]);
+
+  // Master refresh function: synchronizes all three sections
+  const refreshAll = useCallback(
+    (currentFilters = filters) => {
+      fetchProblems(currentFilters);
+      fetchReviseToday();
+      fetchStats();
+    },
+    [fetchProblems, fetchReviseToday, fetchStats, filters]
+  );
+
+  // Load everything on initial mount
   useEffect(() => {
-    loadProblems();
+    refreshAll(filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Called when a new problem is created by ProblemForm
-  const handleProblemAdded = (newProblem) => {
-    // Add the new problem to the top of our state list
-    setProblems((prevProblems) => [newProblem, ...prevProblems]);
+  // Filter change handler
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    fetchProblems(newFilters);
   };
 
-  // Called when "Mark Solved" is clicked
+  // Clear filters handler
+  const handleClearFilters = () => {
+    const cleared = { topic: '', difficulty: '', status: '' };
+    setFilters(cleared);
+    fetchProblems(cleared);
+  };
+
+  // Called when a new problem is created
+  const handleProblemAdded = () => {
+    refreshAll(filters);
+  };
+
+  // Called when "Solve" is clicked
   const handleMarkSolved = async (id) => {
     setError('');
     try {
-      const updated = await markProblemSolved(id, onUnauthorized);
-      // Replace the old problem object with the updated one from backend
-      setProblems((prev) =>
-        prev.map((prob) => (prob.id === id ? updated : prob))
-      );
+      await markProblemSolved(id, onUnauthorized);
+      // Refresh table, stats, and revision list after action
+      refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to mark problem as solved.');
     }
   };
 
-  // Called when "Revise" is clicked
+  // Called when "Revise" is clicked (from table or Revise Today panel)
   const handleMarkRevised = async (id) => {
     setError('');
     try {
-      const updated = await markProblemRevised(id, onUnauthorized);
-      // Replace the old problem with updated revisionCount and lastRevisedDate
-      setProblems((prev) =>
-        prev.map((prob) => (prob.id === id ? updated : prob))
-      );
+      await markProblemRevised(id, onUnauthorized);
+      // Refresh table, stats, and revision list after action
+      refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to update revision status.');
     }
@@ -89,14 +156,16 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
 
   // Called when "Delete" is clicked
   const handleDelete = async (id) => {
-    const confirmed = window.confirm('Are you sure you want to delete this problem?');
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this problem?'
+    );
     if (!confirmed) return;
 
     setError('');
     try {
       await deleteProblem(id, onUnauthorized);
-      // Filter out the deleted problem from state
-      setProblems((prev) => prev.filter((prob) => prob.id !== id));
+      // Refresh table, stats, and revision list after action
+      refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to delete problem.');
     }
@@ -104,12 +173,12 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
 
   return (
     <div className="dashboard-container">
-      {/* Top Navigation / Header */}
+      {/* Top Header */}
       <header className="dashboard-header">
         <div className="header-brand">
           <h1>DSA & Placement Tracker</h1>
           <p className="user-welcome">
-            Logged in as <strong>{user?.name || user?.email || 'User'}</strong>
+            Welcome back, <strong>{user?.name || user?.email || 'User'}</strong>
           </p>
         </div>
         <div className="header-actions">
@@ -119,10 +188,24 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
         </div>
       </header>
 
-      {/* Global Dashboard Error Banner */}
+      {/* Global Error Banner */}
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* Add Problem Form */}
+      {/* 1. Preparation Stats Panel */}
+      <section className="section-stats">
+        <StatsPanel stats={stats} loading={statsLoading} />
+      </section>
+
+      {/* 2. Revise Today Panel */}
+      <section className="section-revise">
+        <ReviseToday
+          problemsDue={reviseProblems}
+          loading={reviseLoading}
+          onRevise={handleMarkRevised}
+        />
+      </section>
+
+      {/* 3. Add Problem Form */}
       <section className="section-form">
         <ProblemForm
           onProblemAdded={handleProblemAdded}
@@ -130,11 +213,14 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
         />
       </section>
 
-      {/* Problems Table */}
+      {/* 4. Problems Table with Filter Bar */}
       <section className="section-list">
         <ProblemList
           problems={problems}
-          loading={loading}
+          loading={problemsLoading}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
           onMarkSolved={handleMarkSolved}
           onMarkRevised={handleMarkRevised}
           onDelete={handleDelete}
@@ -143,4 +229,3 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     </div>
   );
 }
-
