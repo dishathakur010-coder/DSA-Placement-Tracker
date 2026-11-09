@@ -1,122 +1,82 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState, useEffect } from 'react';
+import AuthForm from './components/AuthForm';
+import Dashboard from './components/Dashboard';
+import { getStoredToken, getStoredUser, clearAuthData } from './api';
+import './App.css';
 
+/**
+ * Main App Component
+ * 
+ * What it does:
+ * - Serves as the root component of the application.
+ * - Manages global authentication state (token and user).
+ * - Implements conditional rendering (Task 7A requirement #7):
+ *     If logged in (token exists)  -> shows the Dashboard.
+ *     If logged out (token is null) -> shows the Login/Register form.
+ * 
+ * What useState does here:
+ * - Initializes `token` and `user` by reading any saved session from localStorage.
+ * - Calling `setToken(...)` switches the entire view between Auth and Dashboard instantly.
+ * 
+ * What useEffect does here:
+ * - Subscribes to the 'auth:unauthorized' window event emitted when a 401 response is caught.
+ * - Automatically logs the user out if their JWT token expires.
+ */
 function App() {
-  const [count, setCount] = useState(0)
+  // Read initial auth state from localStorage
+  const [token, setToken] = useState(() => getStoredToken());
+  const [user, setUser] = useState(() => getStoredUser());
+
+  // Called when login or registration is successful
+  const handleAuthSuccess = (newToken, newUser) => {
+    setToken(newToken);
+    setUser(newUser);
+  };
+
+  // Called when the user clicks "Logout" or receives a 401 Unauthorized
+  const handleLogout = () => {
+    clearAuthData();
+    setToken(null);
+    setUser(null);
+  };
+
+  // Listen for 401 Unauthorized events from api.js
+  useEffect(() => {
+    const onUnauthorizedEvent = () => {
+      handleLogout();
+    };
+
+    window.addEventListener('auth:unauthorized', onUnauthorizedEvent);
+
+    // Cleanup listener when component unmounts
+    return () => {
+      window.removeEventListener('auth:unauthorized', onUnauthorizedEvent);
+    };
+  }, []);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    <div className="app-container">
+      {token ? (
+        // When a token exists, render the Dashboard
+        <Dashboard
+          user={user}
+          onLogout={handleLogout}
+          onUnauthorized={handleLogout}
+        />
+      ) : (
+        // When not logged in, render the Login / Register form
+        <main className="auth-wrapper">
+          <header className="app-branding">
+            <h1>DSA & Placement Tracker</h1>
+            <p className="app-tagline">
+              Master Data Structures & Algorithms, manage your revisions, and ace your interviews.
+            </p>
+          </header>
+          <AuthForm onAuthSuccess={handleAuthSuccess} />
+        </main>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
