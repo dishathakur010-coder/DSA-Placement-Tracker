@@ -1,6 +1,7 @@
 package com.disha.tracker.dto;
 
 import com.disha.tracker.entity.Problem;
+import com.disha.tracker.service.RevisionRules;
 
 import java.time.LocalDate;
 
@@ -18,6 +19,12 @@ public class ProblemResponse {
     private int revisionCount;
     private String platform;
     private String externalId;
+
+    // Revision Lock and Mastery Metadata
+    private boolean canRevise;
+    private long daysUntilRevisable;
+    private boolean mastered;
+    private boolean suggested;
 
     // Default constructor
     public ProblemResponse() {
@@ -67,6 +74,13 @@ public class ProblemResponse {
         );
         response.setPlatform(problem.getPlatform());
         response.setExternalId(problem.getExternalId());
+
+        LocalDate today = LocalDate.now();
+        response.setMastered(RevisionRules.isMastered(problem));
+        response.setCanRevise(RevisionRules.canRevise(problem, today));
+        response.setDaysUntilRevisable(RevisionRules.daysUntilRevisable(problem, today));
+        response.setSuggested(false);
+
         return response;
     }
 
@@ -166,6 +180,36 @@ public class ProblemResponse {
     public void setExternalId(String externalId) {
         this.externalId = externalId;
     }
+
+    public boolean isCanRevise() {
+        return canRevise;
+    }
+
+    public void setCanRevise(boolean canRevise) {
+        this.canRevise = canRevise;
+    }
+
+    public long getDaysUntilRevisable() {
+        return daysUntilRevisable;
+    }
+
+    public void setDaysUntilRevisable(long daysUntilRevisable) {
+        this.daysUntilRevisable = daysUntilRevisable;
+    }
+
+    public boolean isMastered() {
+        return mastered;
+    }
+
+    public void setMastered(boolean mastered) {
+        this.mastered = mastered;
+    }
+
+    public boolean isSuggested() {
+        return suggested;
+    }
+
+    public void setSuggested(boolean suggested) {
+        this.suggested = suggested;
+    }
 }
-
-

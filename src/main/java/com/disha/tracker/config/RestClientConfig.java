@@ -13,6 +13,11 @@ import java.time.Duration;
 public class RestClientConfig {
 
     @Bean
+    public RestClient.Builder restClientBuilder() {
+        return RestClient.builder();
+    }
+
+    @Bean
     public RestClient codeforcesRestClient() {
         // Connect timeout of 10s via JDK HttpClient
         HttpClient httpClient = HttpClient.newBuilder()

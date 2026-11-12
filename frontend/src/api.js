@@ -225,9 +225,18 @@ export async function syncCodeforces(onUnauthorized = null) {
 }
 
 // -------------------------------------------------------------
-// Topic Insights Endpoint
+// Topic Cards, Problem List, & Revision Stats Endpoints
 // -------------------------------------------------------------
 
-export async function getTopicInsights(onUnauthorized = null) {
-  return apiFetch('/api/insights/topics', { method: 'GET' }, onUnauthorized);
+export async function getTopicsSummary(onUnauthorized = null) {
+  return apiFetch('/api/topics/summary', { method: 'GET' }, onUnauthorized);
+}
+
+export async function getTopicProblems(topic, onUnauthorized = null) {
+  const encodedTopic = encodeURIComponent(topic);
+  return apiFetch(`/api/topics/problems?topic=${encodedTopic}`, { method: 'GET' }, onUnauthorized);
+}
+
+export async function getRevisionStats(onUnauthorized = null) {
+  return apiFetch('/api/revision/stats', { method: 'GET' }, onUnauthorized);
 }

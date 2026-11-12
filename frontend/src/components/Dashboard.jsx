@@ -2,31 +2,30 @@ import { useState, useEffect, useCallback } from 'react';
 import ProblemForm from './ProblemForm';
 import ConnectProfiles from './ConnectProfiles';
 import ProblemList from './ProblemList';
-import ReviseToday from './ReviseToday';
 import StatsPanel from './StatsPanel';
-import TopicInsights from './TopicInsights';
+import TopicCards from './TopicCards';
+import TopicProblemList from './TopicProblemList';
+import RevisionStats from './RevisionStats';
 import {
   getProblems,
   deleteProblem,
   markProblemSolved,
   markProblemRevised,
-  getProblemsDueForRevision,
   getStats,
-  getTopicInsights,
+  getTopicsSummary,
+  getRevisionStats,
 } from '../api';
 
 /**
  * Dashboard Component
  * 
- * What it does:
- * - Coordinates all main panels:
- *     1. StatsPanel (real-time progress, topic bars, weakest topic)
- *     2. TopicInsights (topic revision freshness, days since last solve/revision, neglected topic)
- *     3. ReviseToday (spaced repetition items due today with overdue calculation, top 10 most overdue)
- *     4. ConnectProfiles (Codeforces full history sync)
- *     5. ProblemForm (add new manual problem)
- *     6. ProblemList (filter bar + problems table with Solve, Revise, Delete)
- * - Refreshes all data whenever any problem is added, solved, revised, deleted, or synced.
+ * Coordinates:
+ * 1. StatsPanel (general preparation analytics & weakest topic)
+ * 2. RevisionStats (separate revision numbers & topic strength score bars)
+ * 3. TopicCards / TopicProblemList (interactive cards grid & suggested problem view)
+ * 4. ConnectProfiles (Codeforces full history sync)
+ * 5. ProblemForm (manual problem addition)
+ * 6. ProblemList (filter bar + full problems table)
  */
 export default function Dashboard({ user, onLogout, onUnauthorized }) {
   // Problems table state
@@ -40,17 +39,18 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     status: '',
   });
 
-  // Revise Today state
-  const [reviseProblems, setReviseProblems] = useState([]);
-  const [reviseLoading, setReviseLoading] = useState(true);
-
-  // Stats state
+  // Overall prep stats state
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // Topic Insights state
-  const [insights, setInsights] = useState(null);
-  const [insightsLoading, setInsightsLoading] = useState(true);
+  // Topic Cards & Problem List state
+  const [topics, setTopics] = useState([]);
+  const [topicsLoading, setTopicsLoading] = useState(true);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+
+  // Revision Stats state
+  const [revisionStats, setRevisionStats] = useState(null);
+  const [revisionStatsLoading, setRevisionStatsLoading] = useState(true);
 
   // Error feedback state
   const [error, setError] = useState('');
@@ -71,20 +71,7 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     [filters, onUnauthorized]
   );
 
-  // 2. Fetch problems due for revision today from GET /api/problems/revise-today
-  const fetchReviseToday = useCallback(async () => {
-    setReviseLoading(true);
-    try {
-      const data = await getProblemsDueForRevision(onUnauthorized);
-      setReviseProblems(data || []);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch revision schedule.');
-    } finally {
-      setReviseLoading(false);
-    }
-  }, [onUnauthorized]);
-
-  // 3. Fetch statistics from GET /api/stats
+  // 2. Fetch statistics from GET /api/stats
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     try {
@@ -97,16 +84,29 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     }
   }, [onUnauthorized]);
 
-  // 4. Fetch topic insights from GET /api/insights/topics
-  const fetchInsights = useCallback(async () => {
-    setInsightsLoading(true);
+  // 3. Fetch topic cards summary from GET /api/topics/summary
+  const fetchTopics = useCallback(async () => {
+    setTopicsLoading(true);
     try {
-      const data = await getTopicInsights(onUnauthorized);
-      setInsights(data || null);
+      const data = await getTopicsSummary(onUnauthorized);
+      setTopics(data || []);
     } catch (err) {
-      // Non-fatal, keep existing state
+      // Non-fatal
     } finally {
-      setInsightsLoading(false);
+      setTopicsLoading(false);
+    }
+  }, [onUnauthorized]);
+
+  // 4. Fetch revision stats from GET /api/revision/stats
+  const fetchRevisionStats = useCallback(async () => {
+    setRevisionStatsLoading(true);
+    try {
+      const data = await getRevisionStats(onUnauthorized);
+      setRevisionStats(data || null);
+    } catch (err) {
+      // Non-fatal
+    } finally {
+      setRevisionStatsLoading(false);
     }
   }, [onUnauthorized]);
 
@@ -114,33 +114,31 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
   const refreshAll = useCallback(
     (currentFilters = filters) => {
       fetchProblems(currentFilters);
-      fetchReviseToday();
       fetchStats();
-      fetchInsights();
+      fetchTopics();
+      fetchRevisionStats();
     },
-    [fetchProblems, fetchReviseToday, fetchStats, fetchInsights, filters]
+    [fetchProblems, fetchStats, fetchTopics, fetchRevisionStats, filters]
   );
 
-  // Load everything on initial mount
+  // Initial load
   useEffect(() => {
     refreshAll(filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Filter change handler
+  // Filter handlers
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
     fetchProblems(newFilters);
   };
 
-  // Clear filters handler
   const handleClearFilters = () => {
     const cleared = { topic: '', difficulty: '', status: '' };
     setFilters(cleared);
     fetchProblems(cleared);
   };
 
-  // Called when a new problem is created
   const handleProblemAdded = () => {
     refreshAll(filters);
   };
@@ -150,22 +148,21 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     setError('');
     try {
       await markProblemSolved(id, onUnauthorized);
-      // Refresh table, stats, revision list, and topic insights after action
       refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to mark problem as solved.');
     }
   };
 
-  // Called when "Revise" is clicked (from table or Revise Today panel)
+  // Called when "Revise" is clicked
   const handleMarkRevised = async (id) => {
     setError('');
     try {
       await markProblemRevised(id, onUnauthorized);
-      // Refresh table, stats, revision list, and topic insights after action
       refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to update revision status.');
+      throw err;
     }
   };
 
@@ -179,7 +176,6 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     setError('');
     try {
       await deleteProblem(id, onUnauthorized);
-      // Refresh table, stats, revision list, and topic insights after action
       refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to delete problem.');
@@ -211,18 +207,28 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
         <StatsPanel stats={stats} loading={statsLoading} />
       </section>
 
-      {/* 2. Topic Insights Panel */}
-      <section className="section-insights">
-        <TopicInsights insights={insights} loading={insightsLoading} />
+      {/* 2. Revision Statistics Panel */}
+      <section className="section-revision-stats">
+        <RevisionStats stats={revisionStats} loading={revisionStatsLoading} />
       </section>
 
-      {/* 3. Revise Today Panel */}
-      <section className="section-revise">
-        <ReviseToday
-          problemsDue={reviseProblems}
-          loading={reviseLoading}
-          onRevise={handleMarkRevised}
-        />
+      {/* 3. Topic Cards Grid or Selected Topic Problem List */}
+      <section className="section-topics">
+        {selectedTopic ? (
+          <TopicProblemList
+            topic={selectedTopic}
+            onBack={() => setSelectedTopic(null)}
+            onRevise={handleMarkRevised}
+            onProblemUpdated={() => refreshAll(filters)}
+            onUnauthorized={onUnauthorized}
+          />
+        ) : (
+          <TopicCards
+            topics={topics}
+            loading={topicsLoading}
+            onSelectTopic={(t) => setSelectedTopic(t)}
+          />
+        )}
       </section>
 
       {/* 4. Connect Profiles Card */}

@@ -43,14 +43,7 @@ public class ProblemController {
         return problemService.getProblems(topic, difficulty, status);
     }
 
-    // 2. GET problems due for revision today: GET /api/problems/revise-today
-    @Operation(summary = "Get problems due for revision today")
-    @GetMapping("/revise-today")
-    public List<ProblemRevisionResponse> getProblemsDueForRevision() {
-        return problemService.getProblemsDueForRevision();
-    }
-
-    // 3. GET a single problem: GET /api/problems/{id}
+    // 2. GET a single problem: GET /api/problems/{id}
     @Operation(summary = "Get a problem by ID")
     @GetMapping("/{id}")
     public ResponseEntity<ProblemResponse> getProblemById(@PathVariable Long id) {
