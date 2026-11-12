@@ -24,6 +24,9 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "codeforces_handle", nullable = true)
+    private String codeforcesHandle;
+
     // Default no-argument constructor (required by JPA)
     public User() {
     }
@@ -74,6 +77,14 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getCodeforcesHandle() {
+        return codeforcesHandle;
+    }
+
+    public void setCodeforcesHandle(String codeforcesHandle) {
+        this.codeforcesHandle = codeforcesHandle;
     }
 }
 

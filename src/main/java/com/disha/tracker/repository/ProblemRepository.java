@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface ProblemRepository extends JpaRepository<Problem, Long> {
@@ -46,4 +47,11 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
     @Query("SELECT p.difficulty, COUNT(p), SUM(CASE WHEN LOWER(p.status) = 'solved' THEN 1L ELSE 0L END) " +
            "FROM Problem p WHERE p.user.id = :userId AND p.difficulty IS NOT NULL GROUP BY p.difficulty")
     List<Object[]> countProblemsByDifficultyForUser(@Param("userId") Long userId);
+
+    // Fetch all existing external IDs for a specific user and platform
+    @Query("SELECT p.externalId FROM Problem p WHERE p.user.id = :userId AND p.platform = :platform AND p.externalId IS NOT NULL")
+    Set<String> findExternalIdsByUserIdAndPlatform(@Param("userId") Long userId, @Param("platform") String platform);
+
+    // Check if a problem with a specific externalId already exists for this user and platform
+    boolean existsByUserIdAndPlatformAndExternalId(Long userId, String platform, String externalId);
 }

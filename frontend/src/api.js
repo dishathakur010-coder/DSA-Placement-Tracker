@@ -194,3 +194,32 @@ export async function getProblemsDueForRevision(onUnauthorized = null) {
 export async function getStats(onUnauthorized = null) {
   return apiFetch('/api/stats', { method: 'GET' }, onUnauthorized);
 }
+
+// -------------------------------------------------------------
+// Codeforces Profile & Sync Endpoints
+// -------------------------------------------------------------
+
+export async function getCodeforcesHandle(onUnauthorized = null) {
+  return apiFetch('/api/profile/codeforces', { method: 'GET' }, onUnauthorized);
+}
+
+export async function saveCodeforcesHandle(handle, onUnauthorized = null) {
+  return apiFetch(
+    '/api/profile/codeforces',
+    {
+      method: 'PUT',
+      body: JSON.stringify({ handle }),
+    },
+    onUnauthorized
+  );
+}
+
+export async function syncCodeforces(onUnauthorized = null) {
+  return apiFetch(
+    '/api/sync/codeforces',
+    {
+      method: 'POST',
+    },
+    onUnauthorized
+  );
+}

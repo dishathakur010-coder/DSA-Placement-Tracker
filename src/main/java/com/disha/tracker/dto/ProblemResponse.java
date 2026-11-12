@@ -16,6 +16,8 @@ public class ProblemResponse {
     private LocalDate solvedDate;
     private LocalDate lastRevisedDate;
     private int revisionCount;
+    private String platform;
+    private String externalId;
 
     // Default constructor
     public ProblemResponse() {
@@ -51,7 +53,7 @@ public class ProblemResponse {
         if (problem == null) {
             return null;
         }
-        return new ProblemResponse(
+        ProblemResponse response = new ProblemResponse(
                 problem.getId(),
                 problem.getTitle(),
                 problem.getTopic(),
@@ -63,6 +65,9 @@ public class ProblemResponse {
                 problem.getLastRevisedDate(),
                 problem.getRevisionCount()
         );
+        response.setPlatform(problem.getPlatform());
+        response.setExternalId(problem.getExternalId());
+        return response;
     }
 
     // Getters and Setters
@@ -144,6 +149,22 @@ public class ProblemResponse {
 
     public void setRevisionCount(int revisionCount) {
         this.revisionCount = revisionCount;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
     }
 }
 

@@ -1,5 +1,6 @@
 package com.disha.tracker.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -30,12 +31,19 @@ public class Problem {
     private LocalDate lastRevisedDate;
     private int revisionCount = 0;
 
+    @Column(name = "platform", nullable = false)
+    private String platform = "MANUAL";
+
+    @Column(name = "external_id", nullable = true)
+    private String externalId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     // Default no-argument constructor (required by JPA)
     public Problem() {
+        this.platform = "MANUAL";
     }
 
     // Constructor with basic fields (useful for manual object creation)
@@ -46,6 +54,7 @@ public class Problem {
         this.link = link;
         this.status = status;
         this.notes = notes;
+        this.platform = "MANUAL";
     }
 
     // Constructor with all fields
@@ -59,6 +68,7 @@ public class Problem {
         this.solvedDate = solvedDate;
         this.lastRevisedDate = lastRevisedDate;
         this.revisionCount = revisionCount;
+        this.platform = "MANUAL";
     }
 
     // Getters and Setters
@@ -148,6 +158,22 @@ public class Problem {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
     }
 }
 

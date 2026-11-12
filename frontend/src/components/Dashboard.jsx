@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import ProblemForm from './ProblemForm';
+import ConnectProfiles from './ConnectProfiles';
 import ProblemList from './ProblemList';
 import ReviseToday from './ReviseToday';
 import StatsPanel from './StatsPanel';
@@ -202,6 +203,14 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
           problemsDue={reviseProblems}
           loading={reviseLoading}
           onRevise={handleMarkRevised}
+        />
+      </section>
+
+      {/* Connect Profiles Card */}
+      <section className="section-connect">
+        <ConnectProfiles
+          onSyncSuccess={() => refreshAll(filters)}
+          onUnauthorized={onUnauthorized}
         />
       </section>
 
