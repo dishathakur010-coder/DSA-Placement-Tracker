@@ -10,6 +10,8 @@ import com.disha.tracker.entity.User;
 import com.disha.tracker.exception.ResourceNotFoundException;
 import com.disha.tracker.repository.ProblemRepository;
 import com.disha.tracker.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,7 +23,6 @@ import org.springframework.web.client.RestClient;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,6 +31,9 @@ import java.util.Set;
 
 @Service
 public class CodeforcesSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(CodeforcesSyncService.class);
+    private static final int BATCH_SIZE = 100;
 
     private final RestClient codeforcesRestClient;
     private final ProblemRepository problemRepository;
@@ -75,7 +79,7 @@ public class CodeforcesSyncService {
         return new CodeforcesProfileResponse(cleanHandle, "Codeforces handle saved successfully");
     }
 
-    // 3. Sync solved problems from Codeforces for the logged-in user
+    // 3. Sync solved problems from Codeforces for the logged-in user (full history)
     public SyncSummaryResponse syncCodeforces() {
         User user = getCurrentUser();
         String handle = user.getCodeforcesHandle();
@@ -86,27 +90,46 @@ public class CodeforcesSyncService {
 
         handle = handle.trim();
 
-        // Step A: Call Codeforces API
-        CodeforcesResponse response;
-        try {
-            final String targetHandle = handle;
-            response = codeforcesRestClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/user.status")
-                            .queryParam("handle", targetHandle)
-                            .build())
-                    .retrieve()
-                    .body(CodeforcesResponse.class);
-        } catch (HttpClientErrorException ex) {
-            String responseBody = ex.getResponseBodyAsString();
-            if (responseBody != null && responseBody.toLowerCase().contains("not found")) {
-                throw new IllegalArgumentException("Codeforces user not found: " + handle);
+        // Step A: Call Codeforces API with 1 retry on timeout and backend logging
+        CodeforcesResponse response = null;
+        int maxAttempts = 2; // Initial attempt + 1 retry on timeout
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                final String targetHandle = handle;
+                response = codeforcesRestClient.get()
+                        .uri(uriBuilder -> uriBuilder
+                                .path("/user.status")
+                                .queryParam("handle", targetHandle)
+                                .build())
+                        .retrieve()
+                        .body(CodeforcesResponse.class);
+                break; // Request succeeded
+            } catch (HttpClientErrorException ex) {
+                log.error("Codeforces API error for handle {}: status={}, body={}",
+                        handle, ex.getStatusCode(), ex.getResponseBodyAsString(), ex);
+                String responseBody = ex.getResponseBodyAsString();
+                if (responseBody != null && responseBody.toLowerCase().contains("not found")) {
+                    throw new IllegalArgumentException("Codeforces user not found: " + handle);
+                }
+                throw new IllegalArgumentException("Codeforces error for handle '" + handle + "': " + ex.getStatusText());
+            } catch (ResourceAccessException ex) {
+                log.warn("Codeforces API timeout on attempt {}/{} for handle {}: {}",
+                        attempt, maxAttempts, handle, ex.getMessage(), ex);
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(1000); // 1-second pause before retry
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                    continue; // Retry
+                }
+                log.error("Codeforces API timed out after {} attempts for handle {}", maxAttempts, handle, ex);
+                throw new IllegalStateException("Codeforces API timed out or is unreachable. Please check your connection and try again.");
+            } catch (Exception ex) {
+                log.error("Unexpected error fetching Codeforces submissions for handle {}: {}", handle, ex.getMessage(), ex);
+                throw new IllegalStateException("Failed to sync with Codeforces: " + ex.getMessage());
             }
-            throw new IllegalArgumentException("Codeforces error for handle '" + handle + "': " + ex.getStatusText());
-        } catch (ResourceAccessException ex) {
-            throw new IllegalStateException("Codeforces API timed out or is unreachable. Please check your connection and try again.");
-        } catch (Exception ex) {
-            throw new IllegalStateException("Failed to sync with Codeforces: " + ex.getMessage());
         }
 
         if (response == null || !"OK".equalsIgnoreCase(response.status())) {
@@ -121,10 +144,8 @@ public class CodeforcesSyncService {
             return new SyncSummaryResponse(0, 0, "No submissions found for handle: " + handle);
         }
 
-        // Step B: Calculate 60 days cutoff timestamp
-        long cutoffSeconds = Instant.now().minus(60, ChronoUnit.DAYS).getEpochSecond();
-
-        // Step C: Filter for verdict "OK" and find the earliest (first) accepted submission per problem
+        // Step B: Filter for verdict "OK" and find the earliest (first accepted) submission per problem
+        // across the FULL submission history.
         Map<String, CodeforcesSubmission> earliestAcceptedByProblem = new LinkedHashMap<>();
 
         for (CodeforcesSubmission sub : submissions) {
@@ -145,22 +166,14 @@ public class CodeforcesSyncService {
             }
         }
 
-        // Step D: Filter for problems whose first accepted submission was within the last 60 days
-        List<CodeforcesSubmission> recentFirstSolves = new ArrayList<>();
-        for (CodeforcesSubmission sub : earliestAcceptedByProblem.values()) {
-            if (sub.creationTimeSeconds() >= cutoffSeconds) {
-                recentFirstSolves.add(sub);
-            }
-        }
-
-        // Step E: Fetch all existing external IDs already imported for this user to deduplicate
+        // Step C: Fetch existing external IDs already imported for this user to deduplicate
         Set<String> existingExternalIds = problemRepository.findExternalIdsByUserIdAndPlatform(user.getId(), "CODEFORCES");
 
         int importedCount = 0;
         int skippedCount = 0;
         List<Problem> problemsToSave = new ArrayList<>();
 
-        for (CodeforcesSubmission sub : recentFirstSolves) {
+        for (CodeforcesSubmission sub : earliestAcceptedByProblem.values()) {
             CodeforcesProblem cfProblem = sub.problem();
             String externalId = (cfProblem.contestId() != null ? cfProblem.contestId() : "") + cfProblem.index().trim();
 
@@ -181,6 +194,7 @@ public class CodeforcesSyncService {
                     ? "https://codeforces.com/problemset/problem/" + cfProblem.contestId() + "/" + cfProblem.index().trim()
                     : "https://codeforces.com/problemset";
 
+            // First accepted solve date
             LocalDate solvedDate = Instant.ofEpochSecond(sub.creationTimeSeconds())
                     .atZone(ZoneId.systemDefault())
                     .toLocalDate();
@@ -200,12 +214,16 @@ public class CodeforcesSyncService {
             problem.setUser(user);
 
             problemsToSave.add(problem);
-            // Also add to existingExternalIds to prevent duplicate within the same sync batch
+            // Also add to existingExternalIds to prevent duplicates within the same run
             existingExternalIds.add(externalId);
         }
 
+        // Step D: Save in batches of 100 to handle large submission histories reliably
         if (!problemsToSave.isEmpty()) {
-            problemRepository.saveAll(problemsToSave);
+            for (int i = 0; i < problemsToSave.size(); i += BATCH_SIZE) {
+                int end = Math.min(i + BATCH_SIZE, problemsToSave.size());
+                problemRepository.saveAll(problemsToSave.subList(i, end));
+            }
             importedCount = problemsToSave.size();
         }
 
@@ -215,4 +233,3 @@ public class CodeforcesSyncService {
         return new SyncSummaryResponse(importedCount, skippedCount, summaryMessage);
     }
 }
-

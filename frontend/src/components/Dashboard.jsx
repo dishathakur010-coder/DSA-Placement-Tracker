@@ -4,6 +4,7 @@ import ConnectProfiles from './ConnectProfiles';
 import ProblemList from './ProblemList';
 import ReviseToday from './ReviseToday';
 import StatsPanel from './StatsPanel';
+import TopicInsights from './TopicInsights';
 import {
   getProblems,
   deleteProblem,
@@ -11,26 +12,21 @@ import {
   markProblemRevised,
   getProblemsDueForRevision,
   getStats,
+  getTopicInsights,
 } from '../api';
 
 /**
  * Dashboard Component
  * 
  * What it does:
- * - Coordinates all four main panels:
+ * - Coordinates all main panels:
  *     1. StatsPanel (real-time progress, topic bars, weakest topic)
- *     2. ReviseToday (spaced repetition items due today with overdue calculation)
- *     3. ProblemForm (add new problem with topic dropdown)
- *     4. ProblemList (filter bar + problems table with Solve, Revise, Delete)
- * - Refreshes all data whenever any problem is added, solved, revised, or deleted.
- * 
- * What useState does here:
- * - Keeps separate state for problems, revise problems, and stats.
- * - Keeps track of loading states for each panel so users see loading indicators.
- * - Stores the active filter values (topic, difficulty, status).
- * 
- * What useEffect does here:
- * - Runs once on mount to fetch problems, revision list, and stats simultaneously.
+ *     2. TopicInsights (topic revision freshness, days since last solve/revision, neglected topic)
+ *     3. ReviseToday (spaced repetition items due today with overdue calculation, top 10 most overdue)
+ *     4. ConnectProfiles (Codeforces full history sync)
+ *     5. ProblemForm (add new manual problem)
+ *     6. ProblemList (filter bar + problems table with Solve, Revise, Delete)
+ * - Refreshes all data whenever any problem is added, solved, revised, deleted, or synced.
  */
 export default function Dashboard({ user, onLogout, onUnauthorized }) {
   // Problems table state
@@ -51,6 +47,10 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
   // Stats state
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
+
+  // Topic Insights state
+  const [insights, setInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
 
   // Error feedback state
   const [error, setError] = useState('');
@@ -97,14 +97,28 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     }
   }, [onUnauthorized]);
 
-  // Master refresh function: synchronizes all three sections
+  // 4. Fetch topic insights from GET /api/insights/topics
+  const fetchInsights = useCallback(async () => {
+    setInsightsLoading(true);
+    try {
+      const data = await getTopicInsights(onUnauthorized);
+      setInsights(data || null);
+    } catch (err) {
+      // Non-fatal, keep existing state
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, [onUnauthorized]);
+
+  // Master refresh function: synchronizes all sections
   const refreshAll = useCallback(
     (currentFilters = filters) => {
       fetchProblems(currentFilters);
       fetchReviseToday();
       fetchStats();
+      fetchInsights();
     },
-    [fetchProblems, fetchReviseToday, fetchStats, filters]
+    [fetchProblems, fetchReviseToday, fetchStats, fetchInsights, filters]
   );
 
   // Load everything on initial mount
@@ -136,7 +150,7 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     setError('');
     try {
       await markProblemSolved(id, onUnauthorized);
-      // Refresh table, stats, and revision list after action
+      // Refresh table, stats, revision list, and topic insights after action
       refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to mark problem as solved.');
@@ -148,7 +162,7 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     setError('');
     try {
       await markProblemRevised(id, onUnauthorized);
-      // Refresh table, stats, and revision list after action
+      // Refresh table, stats, revision list, and topic insights after action
       refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to update revision status.');
@@ -165,7 +179,7 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
     setError('');
     try {
       await deleteProblem(id, onUnauthorized);
-      // Refresh table, stats, and revision list after action
+      // Refresh table, stats, revision list, and topic insights after action
       refreshAll(filters);
     } catch (err) {
       setError(err.message || 'Failed to delete problem.');
@@ -197,7 +211,12 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
         <StatsPanel stats={stats} loading={statsLoading} />
       </section>
 
-      {/* 2. Revise Today Panel */}
+      {/* 2. Topic Insights Panel */}
+      <section className="section-insights">
+        <TopicInsights insights={insights} loading={insightsLoading} />
+      </section>
+
+      {/* 3. Revise Today Panel */}
       <section className="section-revise">
         <ReviseToday
           problemsDue={reviseProblems}
@@ -206,7 +225,7 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
         />
       </section>
 
-      {/* Connect Profiles Card */}
+      {/* 4. Connect Profiles Card */}
       <section className="section-connect">
         <ConnectProfiles
           onSyncSuccess={() => refreshAll(filters)}
@@ -214,7 +233,7 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
         />
       </section>
 
-      {/* 3. Add Problem Form */}
+      {/* 5. Add Problem Form */}
       <section className="section-form">
         <ProblemForm
           onProblemAdded={handleProblemAdded}
@@ -222,7 +241,7 @@ export default function Dashboard({ user, onLogout, onUnauthorized }) {
         />
       </section>
 
-      {/* 4. Problems Table with Filter Bar */}
+      {/* 6. Problems Table with Filter Bar */}
       <section className="section-list">
         <ProblemList
           problems={problems}

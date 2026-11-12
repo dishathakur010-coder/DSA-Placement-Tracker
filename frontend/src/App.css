@@ -785,6 +785,16 @@
   color: #b91c1c;
 }
 
+.badge-fresh {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.badge-due-soon {
+  background-color: #ffedd5;
+  color: #c2410c;
+}
+
 /* Status Pill */
 .status-pill {
   display: inline-block;

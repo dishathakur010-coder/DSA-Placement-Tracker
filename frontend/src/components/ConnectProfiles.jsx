@@ -160,13 +160,13 @@ export default function ConnectProfiles({ onSyncSuccess, onUnauthorized }) {
               className="btn btn-primary"
               onClick={handleSync}
               disabled={isLoadingHandle || isSaving || isSyncing || (!handle.trim() && !savedHandle)}
-              title="Import solved problems from the last 60 days"
+              title="Import your full solve history from Codeforces"
             >
               {isSyncing ? 'Syncing...' : 'Sync now'}
             </button>
           </div>
           <span className="field-hint" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-            Imports accepted problems from the last 60 days and maps ratings to Easy/Medium/Hard.
+            Imports your full solve history from Codeforces and maps ratings to Easy/Medium/Hard.
           </span>
         </div>
       </form>

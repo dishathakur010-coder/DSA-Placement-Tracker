@@ -196,6 +196,9 @@ public class ProblemService {
             }
         }
 
+        // Sort by most overdue first
+        dueProblems.sort(java.util.Comparator.comparingLong(ProblemRevisionResponse::getDaysOverdue).reversed());
+
         return dueProblems;
     }
 

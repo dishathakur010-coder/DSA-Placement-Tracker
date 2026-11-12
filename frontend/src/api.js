@@ -223,3 +223,11 @@ export async function syncCodeforces(onUnauthorized = null) {
     onUnauthorized
   );
 }
+
+// -------------------------------------------------------------
+// Topic Insights Endpoint
+// -------------------------------------------------------------
+
+export async function getTopicInsights(onUnauthorized = null) {
+  return apiFetch('/api/insights/topics', { method: 'GET' }, onUnauthorized);
+}

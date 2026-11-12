@@ -2,7 +2,9 @@
  * ReviseToday Component
  * 
  * What it does:
- * - Displays all solved problems that are due for spaced repetition revision today or earlier.
+ * - Displays solved problems that are due for spaced repetition revision today or earlier.
+ * - Shows the 10 most overdue problems first to prevent UI flooding.
+ * - Shows "+N more" banner when more than 10 problems are due.
  * - Shows nextRevisionDate and daysOverdue for each due problem.
  * - Shows a "Revise" button that increments revisionCount and reschedules the next revision.
  * - Shows "You're all caught up!" when no problems are due.
@@ -13,6 +15,9 @@
  * - onRevise: Callback function invoked when the "Revise" button is clicked.
  */
 export default function ReviseToday({ problemsDue, loading, onRevise }) {
+  const displayedProblems = problemsDue ? problemsDue.slice(0, 10) : [];
+  const remainingCount = problemsDue ? Math.max(0, problemsDue.length - 10) : 0;
+
   return (
     <div className="card revise-card">
       <div className="card-header">
@@ -42,7 +47,7 @@ export default function ReviseToday({ problemsDue, loading, onRevise }) {
         </div>
       ) : (
         <div className="revise-list">
-          {problemsDue.map((prob) => (
+          {displayedProblems.map((prob) => (
             <div key={prob.id} className="revise-item">
               <div className="revise-item-info">
                 <div className="revise-item-header">
@@ -103,9 +108,28 @@ export default function ReviseToday({ problemsDue, loading, onRevise }) {
               </div>
             </div>
           ))}
+
+          {/* +N more indicator */}
+          {remainingCount > 0 && (
+            <div
+              className="revise-more-banner"
+              style={{
+                textAlign: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: '8px',
+                color: '#64748b',
+                fontSize: '13px',
+                fontWeight: '500',
+                marginTop: '4px',
+              }}
+            >
+              +{remainingCount} more {remainingCount === 1 ? 'problem' : 'problems'} due for revision. Revise these 10 most overdue first!
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
-

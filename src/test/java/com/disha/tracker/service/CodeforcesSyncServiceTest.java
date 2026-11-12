@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
@@ -38,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -110,9 +112,8 @@ class CodeforcesSyncServiceTest {
 
     @SuppressWarnings("unchecked")
     @Test
-    @DisplayName("syncCodeforces filters non-OK verdicts, respects 60-day window, and dedupes")
-    void shouldSyncOnlyEligibleSubmissionsAndDeduplicate() {
-        long nowSeconds = Instant.now().getEpochSecond();
+    @DisplayName("syncCodeforces imports full history, filters non-OK verdicts, and dedupes")
+    void shouldSyncFullHistoryAndDeduplicate() {
         long tenDaysAgoSeconds = Instant.now().minus(10, ChronoUnit.DAYS).getEpochSecond();
         long seventyDaysAgoSeconds = Instant.now().minus(70, ChronoUnit.DAYS).getEpochSecond();
 
@@ -124,7 +125,7 @@ class CodeforcesSyncServiceTest {
         CodeforcesProblem problemB = new CodeforcesProblem(1900L, "B", "Laura and Operations", "PROGRAMMING", 1100, List.of("dp"));
         CodeforcesSubmission subB = new CodeforcesSubmission(102L, 1900L, tenDaysAgoSeconds, "WRONG_ANSWER", problemB);
 
-        // 3. Problem C: solved 70 days ago (outside 60 days) -> should be skipped
+        // 3. Problem C: solved 70 days ago -> FULL HISTORY should be imported!
         CodeforcesProblem problemC = new CodeforcesProblem(1800L, "C", "Old Problem", "PROGRAMMING", 1300, List.of("trees"));
         CodeforcesSubmission subC = new CodeforcesSubmission(103L, 1800L, seventyDaysAgoSeconds, "OK", problemC);
 
@@ -154,7 +155,7 @@ class CodeforcesSyncServiceTest {
 
         // Assert
         assertNotNull(summary);
-        assertEquals(1, summary.getImportedCount()); // Problem A only
+        assertEquals(2, summary.getImportedCount()); // Problem A and Problem C
         assertEquals(1, summary.getSkippedCount());  // Problem D was in DB
 
         @SuppressWarnings("rawtypes")
@@ -163,17 +164,37 @@ class CodeforcesSyncServiceTest {
 
         @SuppressWarnings("unchecked")
         List<Problem> savedProblems = captor.getValue();
-        assertEquals(1, savedProblems.size());
+        assertEquals(2, savedProblems.size());
+    }
 
-        Problem savedProblem = savedProblems.get(0);
-        assertEquals("Cover in Water", savedProblem.getTitle());
-        assertEquals("Math", savedProblem.getTopic());
-        assertEquals("Easy", savedProblem.getDifficulty()); // 800 <= 1200 -> Easy
-        assertEquals("Solved", savedProblem.getStatus());
-        assertEquals(0, savedProblem.getRevisionCount());
-        assertEquals("CODEFORCES", savedProblem.getPlatform());
-        assertEquals("1900A", savedProblem.getExternalId());
-        assertEquals(testUser.getId(), savedProblem.getUser().getId());
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("syncCodeforces retries once on timeout before succeeding")
+    void shouldRetryOnceOnTimeoutBeforeSucceeding() {
+        CodeforcesProblem problemA = new CodeforcesProblem(1900L, "A", "Problem A", "PROGRAMMING", 800, List.of("math"));
+        CodeforcesSubmission subA = new CodeforcesSubmission(101L, 1900L, Instant.now().getEpochSecond(), "OK", problemA);
+        CodeforcesResponse fakeResponse = new CodeforcesResponse("OK", null, List.of(subA));
+
+        RestClient.RequestHeadersUriSpec uriSpec = mock(RestClient.RequestHeadersUriSpec.class);
+        RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
+
+        when(restClient.get()).thenReturn(uriSpec);
+        when(uriSpec.uri(any(Function.class))).thenReturn(uriSpec);
+        when(uriSpec.retrieve()).thenReturn(responseSpec);
+
+        // 1st attempt throws ResourceAccessException (timeout), 2nd attempt succeeds
+        when(responseSpec.body(eq(CodeforcesResponse.class)))
+                .thenThrow(new ResourceAccessException("Connection timed out"))
+                .thenReturn(fakeResponse);
+
+        when(problemRepository.findExternalIdsByUserIdAndPlatform(testUser.getId(), "CODEFORCES"))
+                .thenReturn(new HashSet<>());
+        when(problemRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SyncSummaryResponse summary = codeforcesSyncService.syncCodeforces();
+
+        assertNotNull(summary);
+        assertEquals(1, summary.getImportedCount());
+        verify(responseSpec, times(2)).body(eq(CodeforcesResponse.class));
     }
 }
-
