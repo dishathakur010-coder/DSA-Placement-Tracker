@@ -11,7 +11,7 @@ import { getCodeforcesHandle, saveCodeforcesHandle, syncCodeforces } from '../ap
  * - Shows clear success ("Imported N new problems") or friendly error banners.
  * - Refreshes the dashboard (problem list, stats, revise-today) immediately upon sync.
  */
-export default function ConnectProfiles({ onSyncSuccess, onUnauthorized }) {
+export default function ConnectProfiles({ onSyncSuccess, onUnauthorized, highlight = false }) {
   const [handle, setHandle] = useState('');
   const [savedHandle, setSavedHandle] = useState('');
 
@@ -115,7 +115,7 @@ export default function ConnectProfiles({ onSyncSuccess, onUnauthorized }) {
   };
 
   return (
-    <div className="card form-card connect-profiles-card">
+    <div className={`card form-card connect-profiles-card ${highlight ? 'connect-profiles-highlighted' : ''}`}>
       <div className="card-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '18px' }}>⚡</span>

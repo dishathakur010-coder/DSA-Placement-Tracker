@@ -172,6 +172,11 @@
   color: #b91c1c;
 }
 
+.count-badge-success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
 /* ========================================================
    Stats Panel
    ======================================================== */
@@ -219,6 +224,10 @@
 .stat-hint {
   font-size: 11px;
   color: #94a3b8;
+}
+
+.text-primary {
+  color: #4f46e5;
 }
 
 .text-success {
@@ -352,164 +361,11 @@
 }
 
 /* ========================================================
-   Revise Today Panel
-   ======================================================== */
-.revise-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.revise-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
-  gap: 16px;
-}
-
-.revise-item-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.revise-item-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.revise-item-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: #64748b;
-  flex-wrap: wrap;
-}
-
-.due-date strong {
-  color: #1e293b;
-}
-
-.badge-overdue {
-  background-color: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fca5a5;
-}
-
-.badge-due-today {
-  background-color: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
-}
-
-.past-revisions {
-  color: #64748b;
-}
-
-.caught-up-box {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.caught-up-title {
-  margin: 0;
-  font-weight: 700;
-  font-size: 15px;
-}
-
-.caught-up-text {
-  margin: 0;
-  font-size: 13px;
-}
-
-/* ========================================================
-   Filter Bar
-   ======================================================== */
-.filter-bar {
-  margin-bottom: 20px;
-  padding: 14px 16px;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-}
-
-.filter-group {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  flex: 1;
-  min-width: 140px;
-}
-
-.filter-item label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-}
-
-.filter-item select {
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background-color: #ffffff;
-  color: #1e293b;
-  cursor: pointer;
-}
-
-.filter-item select:focus {
-  outline: none;
-  border-color: #4f46e5;
-}
-
-.filter-action {
-  flex: 0 0 auto;
-  min-width: auto;
-}
-
-.btn-clear {
-  padding: 8px 14px;
-  font-size: 13px;
-  color: #dc2626;
-  border-color: #fca5a5;
-  background-color: #ffffff;
-}
-
-.btn-clear:hover {
-  background-color: #fef2f2;
-  border-color: #f87171;
-  color: #b91c1c;
-}
-
-/* ========================================================
    Forms & Inputs
    ======================================================== */
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
 }
 
@@ -527,10 +383,6 @@
   font-size: 13px;
   font-weight: 600;
   color: #334155;
-}
-
-.required {
-  color: #ef4444;
 }
 
 .field input,
@@ -630,16 +482,6 @@
   transition: all 0.15s ease;
 }
 
-.btn-solve {
-  background-color: #ecfdf5;
-  color: #065f46;
-  border-color: #a7f3d0;
-}
-
-.btn-solve:hover {
-  background-color: #d1fae5;
-}
-
 .btn-revise {
   background-color: #e0e7ff;
   color: #3730a3;
@@ -648,16 +490,6 @@
 
 .btn-revise:hover {
   background-color: #c7d2fe;
-}
-
-.btn-delete {
-  background-color: #fff1f2;
-  color: #be123c;
-  border-color: #fecdd3;
-}
-
-.btn-delete:hover {
-  background-color: #ffe4e6;
 }
 
 /* ========================================================
@@ -785,37 +617,6 @@
   color: #b91c1c;
 }
 
-.badge-fresh {
-  background-color: #dcfce7;
-  color: #15803d;
-}
-
-.badge-due-soon {
-  background-color: #ffedd5;
-  color: #c2410c;
-}
-
-/* Status Pill */
-.status-pill {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-solved {
-  background-color: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-}
-
-.status-pending {
-  background-color: #f8fafc;
-  color: #64748b;
-  border: 1px solid #cbd5e1;
-}
-
 .revision-count {
   display: inline-block;
   min-width: 24px;
@@ -873,10 +674,6 @@
     grid-template-columns: 1fr;
   }
 
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
@@ -888,24 +685,6 @@
   }
 
   .header-actions .btn {
-    width: 100%;
-  }
-
-  .filter-group {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .revise-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .revise-item-action {
-    width: 100%;
-  }
-
-  .revise-item-action .btn {
     width: 100%;
   }
 }
@@ -1064,4 +843,27 @@
   font-size: 11px;
   font-weight: 600;
   margin-left: 6px;
+}
+
+/* ========================================================
+   Connect Profiles & Empty State Highlight
+   ======================================================== */
+.connect-profiles-card {
+  transition: all 0.3s ease;
+}
+
+.connect-profiles-card.connect-profiles-highlighted {
+  border: 2px solid #4f46e5;
+  background-color: #faf5ff;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15), 0 4px 16px rgba(79, 70, 229, 0.12);
+  animation: pulse-border 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15), 0 4px 16px rgba(79, 70, 229, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.28), 0 6px 20px rgba(79, 70, 229, 0.18);
+  }
 }

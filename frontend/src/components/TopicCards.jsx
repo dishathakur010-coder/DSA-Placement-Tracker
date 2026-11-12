@@ -32,9 +32,9 @@ export default function TopicCards({ topics, loading, onSelectTopic }) {
           <p className="subtitle">Track your revision recency and suggested problems per topic.</p>
         </div>
         <div className="empty-state">
-          <p className="empty-title">No solved problems yet</p>
-          <p className="empty-description">
-            Solve problems or sync your Codeforces profile to populate your topic revision cards!
+          <p className="empty-title">No synced problems yet</p>
+          <p className="empty-desc" style={{ color: '#4f46e5', fontWeight: '500' }}>
+            Connect your Codeforces handle and click Sync now to see your topics
           </p>
         </div>
       </div>
